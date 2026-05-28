@@ -145,14 +145,18 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
                 // Step 1: Get ID token via CredentialManager (using main activity)
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setServerClientId(args.clientId)
-                    .setFilterByAuthorizedAccounts(false)
+                    .setFilterByAuthorizedAccounts(false).setAutoSelectEnabled(false)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
                     .build()
 
-                val result = credentialManager.getCredential(activity, request)
+                val result = credentialManager.getCredential(
+        context = activity,
+        request = request
+    )
+
                 val credential = result.credential
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val idToken = googleIdTokenCredential.idToken
