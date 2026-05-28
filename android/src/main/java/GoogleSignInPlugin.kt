@@ -1,5 +1,7 @@
 package app.tauri.googleauth
 
+import java.security.SecureRandom
+import android.util.Base64
 import android.app.Activity
 import android.content.Intent
 import android.util.Log
@@ -61,6 +63,12 @@ class RefreshTokenArgs {
     var clientSecret: String? = null
     var scopes: List<String>? = null
     var flowType: String? = null
+}
+
+fun generateSecureRandomNonce(byteLength: Int = 32): String {
+    val randomBytes = ByteArray(byteLength)
+    SecureRandom().nextBytes(randomBytes)
+    return Base64.encodeToString(randomBytes, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
 }
 
 @TauriPlugin
@@ -145,7 +153,7 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
                 // Step 1: Get ID token via CredentialManager (using main activity)
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setServerClientId(args.clientId)
-                    .setFilterByAuthorizedAccounts(false).setAutoSelectEnabled(false)
+                    .setFilterByAuthorizedAccounts(false).setAutoSelectEnabled(false).setNonce(generateSecureRandomNonce())
                     .build()
 
                 val request = GetCredentialRequest.Builder()
