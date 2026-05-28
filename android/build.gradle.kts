@@ -7,10 +7,13 @@ plugins {
 
 android {
     namespace = "app.tauri.googleauth"
+    // Android 17
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 21
+        // Android 8.0 and above
+        minSdk = 26
+        targetSdk = 37
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
