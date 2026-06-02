@@ -11,9 +11,9 @@ import com.google.android.gms.auth.api.identity.AuthorizationClient
 import com.google.android.gms.auth.api.identity.Identity
 
 /**
- * Activity that handles authorization resolution when user consent is required.
- * This activity receives a PendingIntent from AuthorizationClient and launches it
- * to get user consent, then returns the authorization result.
+ * Activity that handles authorization resolution when user consent is required. This activity
+ * receives a PendingIntent from AuthorizationClient and launches it to get user consent, then
+ * returns the authorization result.
  */
 class NativeSignInActivity : ComponentActivity() {
 
@@ -33,18 +33,18 @@ class NativeSignInActivity : ComponentActivity() {
 
         authorizationClient = Identity.getAuthorizationClient(this)
 
-        authorizationLauncher = registerForActivityResult(
-            ActivityResultContracts.StartIntentSenderForResult()
-        ) { result ->
-            handleAuthorizationResult(result.resultCode, result.data)
-        }
+        authorizationLauncher =
+                registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+                        result ->
+                    handleAuthorizationResult(result.resultCode, result.data)
+                }
 
-        val pendingIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(EXTRA_PENDING_INTENT, PendingIntent::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(EXTRA_PENDING_INTENT)
-        }
+        val pendingIntent =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(EXTRA_PENDING_INTENT, PendingIntent::class.java)
+                } else {
+                    @Suppress("DEPRECATION") intent.getParcelableExtra(EXTRA_PENDING_INTENT)
+                }
 
         if (pendingIntent == null) {
             finishWithError("No pending intent provided")
@@ -52,9 +52,8 @@ class NativeSignInActivity : ComponentActivity() {
         }
 
         try {
-            val intentSenderRequest = IntentSenderRequest.Builder(
-                pendingIntent.intentSender
-            ).build()
+            val intentSenderRequest =
+                    IntentSenderRequest.Builder(pendingIntent.intentSender).build()
             authorizationLauncher.launch(intentSenderRequest)
         } catch (e: Exception) {
             finishWithError("Failed to launch authorization: ${e.message}")
@@ -88,18 +87,17 @@ class NativeSignInActivity : ComponentActivity() {
     }
 
     private fun finishWithSuccess(accessToken: String, grantedScopes: Array<String>) {
-        val intent = Intent().apply {
-            putExtra(RESULT_ACCESS_TOKEN, accessToken)
-            putExtra(RESULT_GRANTED_SCOPES, grantedScopes)
-        }
+        val intent =
+                Intent().apply {
+                    putExtra(RESULT_ACCESS_TOKEN, accessToken)
+                    putExtra(RESULT_GRANTED_SCOPES, grantedScopes)
+                }
         setResult(RESULT_OK, intent)
         finish()
     }
 
     private fun finishWithError(errorMessage: String) {
-        val intent = Intent().apply {
-            putExtra(RESULT_ERROR, errorMessage)
-        }
+        val intent = Intent().apply { putExtra(RESULT_ERROR, errorMessage) }
         setResult(RESULT_CANCELED, intent)
         finish()
     }

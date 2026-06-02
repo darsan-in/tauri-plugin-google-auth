@@ -1,9 +1,8 @@
 package app.tauri.googleauth
 
-import java.security.SecureRandom
-import android.util.Base64
 import android.app.Activity
 import android.content.Intent
+import android.util.Base64
 import android.util.Log
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
@@ -29,6 +28,8 @@ import com.google.android.gms.common.api.Scope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.gson.Gson
+import java.security.SecureRandom
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,7 +38,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 
 @InvokeArg
 class SignInArgs {
@@ -68,16 +68,18 @@ class RefreshTokenArgs {
 fun generateSecureRandomNonce(byteLength: Int = 32): String {
     val randomBytes = ByteArray(byteLength)
     SecureRandom().nextBytes(randomBytes)
-    return Base64.encodeToString(randomBytes, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+    return Base64.encodeToString(
+            randomBytes,
+            Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING
+    )
 }
 
 @TauriPlugin
 class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
-    
+
     companion object {
         private const val TAG = "GoogleSignInPlugin"
-        
-        
+
         const val TITLE = "title"
         const val SUBTITLE = "subtitle"
         const val CLIENT_ID = "clientId"
@@ -87,15 +89,16 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         const val AUTH_CODE = "authCode"
         const val GRANTED_SCOPES = "grantedScopes"
         const val ERROR_MESSAGE = "errorMessage"
-        
+
         var RESULT_EXTRA_PREFIX = ""
     }
-    
+
     private val scope = CoroutineScope(Dispatchers.Main)
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val httpClient =
+            OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build()
     private val gson = Gson()
     private lateinit var authorizationClient: AuthorizationClient
     private lateinit var signInClient: SignInClient
@@ -109,7 +112,7 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         signInClient = Identity.getSignInClient(activity)
         credentialManager = CredentialManager.create(activity)
     }
-    
+
     @Command
     fun signIn(invoke: Invoke) {
         try {
@@ -136,14 +139,15 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun signInWeb(invoke: Invoke, args: SignInArgs) {
-        val intent = Intent(activity, GoogleSignInActivity::class.java).apply {
-            putExtra(CLIENT_ID, args.clientId)
-            putExtra(CLIENT_SECRET, args.clientSecret)
-            putExtra(SCOPES, args.scopes.toTypedArray())
-            putExtra(REDIRECT_URI, args.redirectUri)
-            putExtra(TITLE, "Sign in with Google")
-            putExtra(SUBTITLE, "Choose an account")
-        }
+        val intent =
+                Intent(activity, GoogleSignInActivity::class.java).apply {
+                    putExtra(CLIENT_ID, args.clientId)
+                    putExtra(CLIENT_SECRET, args.clientSecret)
+                    putExtra(SCOPES, args.scopes.toTypedArray())
+                    putExtra(REDIRECT_URI, args.redirectUri)
+                    putExtra(TITLE, "Sign in with Google")
+                    putExtra(SUBTITLE, "Choose an account")
+                }
         startActivityForResult(invoke, intent, "signInResult")
     }
 
@@ -151,19 +155,18 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         scope.launch {
             try {
                 // Step 1: Get ID token via CredentialManager (using main activity)
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setServerClientId(args.clientId)
-                    .setFilterByAuthorizedAccounts(false).setAutoSelectEnabled(false).setNonce(generateSecureRandomNonce())
-                    .build()
+                val googleIdOption =
+                        GetGoogleIdOption.Builder()
+                                .setServerClientId(args.clientId)
+                                .setFilterByAuthorizedAccounts(false)
+                                .setAutoSelectEnabled(false)
+                                .setNonce(generateSecureRandomNonce())
+                                .build()
 
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
-                    .build()
+                val request =
+                        GetCredentialRequest.Builder().addCredentialOption(googleIdOption).build()
 
-                val result = credentialManager.getCredential(
-        context = activity,
-        request = request
-    )
+                val result = credentialManager.getCredential(context = activity, request = request)
 
                 val credential = result.credential
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
@@ -171,7 +174,6 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
 
                 // Step 2: Get access token via AuthorizationClient
                 startNativeAuthorization(invoke, idToken, args.scopes)
-
             } catch (e: GetCredentialCancellationException) {
                 invoke.reject("Sign-in cancelled: ${e.message}")
             } catch (e: NoCredentialException) {
@@ -188,51 +190,60 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
     private var pendingIdToken: String? = null
 
     private fun startNativeAuthorization(invoke: Invoke, idToken: String, scopes: List<String>) {
-        val authRequest = AuthorizationRequest.builder()
-            .setRequestedScopes(scopes.map { Scope(it) })
-            .build()
+        val authRequest =
+                AuthorizationRequest.builder().setRequestedScopes(scopes.map { Scope(it) }).build()
 
-        authorizationClient.authorize(authRequest)
-            .addOnSuccessListener { authResult ->
-                if (authResult.hasResolution()) {
-                    val pendingIntent = authResult.pendingIntent
-                    if (pendingIntent != null) {
-                        // Need to launch activity for user consent
-                        pendingNativeInvoke = invoke
-                        pendingIdToken = idToken
-                        val intent = Intent(activity, NativeSignInActivity::class.java).apply {
-                            putExtra(NativeSignInActivity.EXTRA_PENDING_INTENT, pendingIntent)
+        authorizationClient
+                .authorize(authRequest)
+                .addOnSuccessListener { authResult ->
+                    if (authResult.hasResolution()) {
+                        val pendingIntent = authResult.pendingIntent
+                        if (pendingIntent != null) {
+                            // Need to launch activity for user consent
+                            pendingNativeInvoke = invoke
+                            pendingIdToken = idToken
+                            val intent =
+                                    Intent(activity, NativeSignInActivity::class.java).apply {
+                                        putExtra(
+                                                NativeSignInActivity.EXTRA_PENDING_INTENT,
+                                                pendingIntent
+                                        )
+                                    }
+                            startActivityForResult(invoke, intent, "nativeAuthorizationResult")
+                        } else {
+                            invoke.reject("No pending intent available for authorization")
                         }
-                        startActivityForResult(invoke, intent, "nativeAuthorizationResult")
                     } else {
-                        invoke.reject("No pending intent available for authorization")
-                    }
-                } else {
-                    // Already authorized
-                    val accessToken = authResult.accessToken
-                    if (accessToken != null) {
-                        val grantedScopes = authResult.grantedScopes.map { it.toString() }.toTypedArray()
-                        resolveNativeSignIn(invoke, idToken, accessToken, grantedScopes)
-                    } else {
-                        invoke.reject("Failed to get access token")
+                        // Already authorized
+                        val accessToken = authResult.accessToken
+                        if (accessToken != null) {
+                            val grantedScopes =
+                                    authResult.grantedScopes.map { it.toString() }.toTypedArray()
+                            resolveNativeSignIn(invoke, idToken, accessToken, grantedScopes)
+                        } else {
+                            invoke.reject("Failed to get access token")
+                        }
                     }
                 }
-            }
-            .addOnFailureListener { e ->
-                invoke.reject("Authorization failed [${e.javaClass.simpleName}]: ${e.message}")
-            }
+                .addOnFailureListener { e ->
+                    invoke.reject("Authorization failed [${e.javaClass.simpleName}]: ${e.message}")
+                }
     }
 
-    private fun resolveNativeSignIn(invoke: Invoke, idToken: String?, accessToken: String, grantedScopes: Array<String>) {
-        val tokenObject = JSObject().apply {
-            put("idToken", idToken ?: "")
-            put("accessToken", accessToken)
-            put("refreshToken", "")
-            put("expiresAt", 0)
-            put("scopes", JSArray().apply {
-                grantedScopes.forEach { put(it) }
-            })
-        }
+    private fun resolveNativeSignIn(
+            invoke: Invoke,
+            idToken: String?,
+            accessToken: String,
+            grantedScopes: Array<String>
+    ) {
+        val tokenObject =
+                JSObject().apply {
+                    put("idToken", idToken ?: "")
+                    put("accessToken", accessToken)
+                    put("refreshToken", "")
+                    put("expiresAt", 0)
+                    put("scopes", JSArray().apply { grantedScopes.forEach { put(it) } })
+                }
         invoke.resolve(tokenObject)
     }
 
@@ -264,11 +275,11 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
 
         resolveNativeSignIn(invoke, idToken, accessToken, grantedScopes ?: emptyArray())
     }
-    
+
     @ActivityCallback
     private fun signInResult(invoke: Invoke, result: ActivityResult) {
         val resultCode = result.resultCode
-        
+
         if (resultCode == Activity.RESULT_CANCELED) {
             val data = result.data
             val errorMessage = data?.getStringExtra(RESULT_EXTRA_PREFIX + ERROR_MESSAGE)
@@ -279,16 +290,16 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
             }
             return
         }
-        
+
         val data = result.data
         val authCode = data?.getStringExtra(RESULT_EXTRA_PREFIX + AUTH_CODE)
         val errorMessage = data?.getStringExtra(RESULT_EXTRA_PREFIX + ERROR_MESSAGE)
-        
+
         if (errorMessage != null) {
             invoke.reject(errorMessage)
             return
         }
-        
+
         if (authCode == null || data == null) {
             invoke.reject("No authorization code received")
             return
@@ -298,21 +309,17 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         val clientSecret = data.getStringExtra(RESULT_EXTRA_PREFIX + CLIENT_SECRET)
         val redirectUri = data.getStringExtra(RESULT_EXTRA_PREFIX + REDIRECT_URI) ?: ""
         val grantedScopes = data.getStringArrayExtra(RESULT_EXTRA_PREFIX + GRANTED_SCOPES)
-        
+
         if (clientId == null) {
             invoke.reject("Client ID not found")
             return
         }
-        
+
         scope.launch {
             try {
-                val tokenResponse = exchangeAuthCodeForTokens(
-                    authCode,
-                    clientId,
-                    clientSecret,
-                    redirectUri
-                )
-                
+                val tokenResponse =
+                        exchangeAuthCodeForTokens(authCode, clientId, clientSecret, redirectUri)
+
                 val tokenObject = createTokenResponse(tokenResponse, grantedScopes?.toList())
                 invoke.resolve(tokenObject)
             } catch (e: Exception) {
@@ -321,7 +328,7 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
             }
         }
     }
-    
+
     @Command
     fun signOut(invoke: Invoke) {
         scope.launch {
@@ -385,7 +392,7 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         ret.put("success", true)
         invoke.resolve(ret)
     }
-    
+
     @Command
     fun refreshToken(invoke: Invoke) {
         scope.launch {
@@ -417,15 +424,17 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private suspend fun refreshWeb(invoke: Invoke, args: RefreshTokenArgs) {
-        val tokenResponse = refreshAccessToken(args.refreshToken!!, args.clientId, args.clientSecret)
+        val tokenResponse =
+                refreshAccessToken(args.refreshToken!!, args.clientId, args.clientSecret)
         val tokenObject = createTokenResponse(tokenResponse)
         invoke.resolve(tokenObject)
     }
 
     private suspend fun refreshNative(invoke: Invoke, args: RefreshTokenArgs) {
-        val authRequest = AuthorizationRequest.builder()
-            .setRequestedScopes(args.scopes!!.map { Scope(it) })
-            .build()
+        val authRequest =
+                AuthorizationRequest.builder()
+                        .setRequestedScopes(args.scopes!!.map { Scope(it) })
+                        .build()
 
         val authResult = authorizationClient.authorize(authRequest).await()
         val accessToken = authResult.accessToken
@@ -435,122 +444,132 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
             return
         }
 
-        val tokenObject = JSObject().apply {
-            put("idToken", "")
-            put("accessToken", accessToken)
-            put("refreshToken", "")
-            put("expiresAt", 0)
-            put("scopes", JSArray().apply {
-                authResult.grantedScopes.forEach { put(it.toString()) }
-            })
-        }
+        val tokenObject =
+                JSObject().apply {
+                    put("idToken", "")
+                    put("accessToken", accessToken)
+                    put("refreshToken", "")
+                    put("expiresAt", 0)
+                    put(
+                            "scopes",
+                            JSArray().apply {
+                                authResult.grantedScopes.forEach { put(it.toString()) }
+                            }
+                    )
+                }
         invoke.resolve(tokenObject)
     }
-    
+
     private suspend fun exchangeAuthCodeForTokens(
-        authCode: String,
-        clientId: String,
-        clientSecret: String?,
-        redirectUri: String
-    ): Map<String, Any?> = withContext(Dispatchers.IO) {
-        val formBody = FormBody.Builder()
-            .add("code", authCode)
-            .add("client_id", clientId)
-            .add("grant_type", "authorization_code")
-            .add("redirect_uri", redirectUri)
-            .apply {
-                clientSecret?.let { add("client_secret", it) }
+            authCode: String,
+            clientId: String,
+            clientSecret: String?,
+            redirectUri: String
+    ): Map<String, Any?> =
+            withContext(Dispatchers.IO) {
+                val formBody =
+                        FormBody.Builder()
+                                .add("code", authCode)
+                                .add("client_id", clientId)
+                                .add("grant_type", "authorization_code")
+                                .add("redirect_uri", redirectUri)
+                                .apply { clientSecret?.let { add("client_secret", it) } }
+                                .build()
+
+                val request =
+                        Request.Builder()
+                                .url("https://oauth2.googleapis.com/token")
+                                .post(formBody)
+                                .build()
+
+                val response = httpClient.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string()
+                    throw Exception("Token exchange failed: $errorBody")
+                }
+
+                val responseBody =
+                        response.body?.string()
+                                ?: throw Exception("Empty response from token endpoint")
+
+                gson.fromJson(responseBody, Map::class.java) as Map<String, Any?>
             }
-            .build()
-        
-        val request = Request.Builder()
-            .url("https://oauth2.googleapis.com/token")
-            .post(formBody)
-            .build()
-        
-        val response = httpClient.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            val errorBody = response.body?.string()
-            throw Exception("Token exchange failed: $errorBody")
-        }
-        
-        val responseBody = response.body?.string()
-            ?: throw Exception("Empty response from token endpoint")
-        
-        gson.fromJson(responseBody, Map::class.java) as Map<String, Any?>
-    }
-    
+
     private suspend fun refreshAccessToken(
-        refreshToken: String,
-        clientId: String,
-        clientSecret: String?
-    ): Map<String, Any?> = withContext(Dispatchers.IO) {
-        val formBody = FormBody.Builder()
-            .add("refresh_token", refreshToken)
-            .add("client_id", clientId)
-            .add("grant_type", "refresh_token")
-            .apply {
-                clientSecret?.let { add("client_secret", it) }
+            refreshToken: String,
+            clientId: String,
+            clientSecret: String?
+    ): Map<String, Any?> =
+            withContext(Dispatchers.IO) {
+                val formBody =
+                        FormBody.Builder()
+                                .add("refresh_token", refreshToken)
+                                .add("client_id", clientId)
+                                .add("grant_type", "refresh_token")
+                                .apply { clientSecret?.let { add("client_secret", it) } }
+                                .build()
+
+                val request =
+                        Request.Builder()
+                                .url("https://oauth2.googleapis.com/token")
+                                .post(formBody)
+                                .build()
+
+                val response = httpClient.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string()
+                    throw Exception("Token refresh failed: $errorBody")
+                }
+
+                val responseBody =
+                        response.body?.string()
+                                ?: throw Exception("Empty response from token endpoint")
+
+                gson.fromJson(responseBody, Map::class.java) as Map<String, Any?>
             }
-            .build()
-        
-        val request = Request.Builder()
-            .url("https://oauth2.googleapis.com/token")
-            .post(formBody)
-            .build()
-        
-        val response = httpClient.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            val errorBody = response.body?.string()
-            throw Exception("Token refresh failed: $errorBody")
-        }
-        
-        val responseBody = response.body?.string()
-            ?: throw Exception("Empty response from token endpoint")
-        
-        gson.fromJson(responseBody, Map::class.java) as Map<String, Any?>
-    }
-    
-    private suspend fun revokeAccessToken(accessToken: String) = withContext(Dispatchers.IO) {
-        val formBody = FormBody.Builder()
-            .add("token", accessToken)
-            .build()
-        
-        val request = Request.Builder()
-            .url("https://oauth2.googleapis.com/revoke")
-            .post(formBody)
-            .build()
-        
-        val response = httpClient.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            val errorBody = response.body?.string()
-            Log.w(TAG, "Token revocation response: $errorBody")
-            // Google's revocation endpoint returns 400 if token is already invalid
-            // We don't throw here as this is not critical for sign-out
-            if (response.code != 400) {
-                throw Exception("Token revocation failed with code ${response.code}")
+
+    private suspend fun revokeAccessToken(accessToken: String) =
+            withContext(Dispatchers.IO) {
+                val formBody = FormBody.Builder().add("token", accessToken).build()
+
+                val request =
+                        Request.Builder()
+                                .url("https://oauth2.googleapis.com/revoke")
+                                .post(formBody)
+                                .build()
+
+                val response = httpClient.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string()
+                    Log.w(TAG, "Token revocation response: $errorBody")
+                    // Google's revocation endpoint returns 400 if token is already invalid
+                    // We don't throw here as this is not critical for sign-out
+                    if (response.code != 400) {
+                        throw Exception("Token revocation failed with code ${response.code}")
+                    }
+                }
             }
-        }
-    }
-    
-    private fun createTokenResponse(tokenResponse: Map<String, Any?>, grantedScopes: List<String>? = null): JSObject {
+
+    private fun createTokenResponse(
+            tokenResponse: Map<String, Any?>,
+            grantedScopes: List<String>? = null
+    ): JSObject {
         val expiresIn = (tokenResponse["expires_in"] as? Number)?.toLong() ?: 3600
         val expiresAt = System.currentTimeMillis() + (expiresIn * 1000)
-        
+
         return JSObject().apply {
             put("idToken", tokenResponse["id_token"] as? String ?: "")
             put("accessToken", tokenResponse["access_token"] as? String ?: "")
             put("refreshToken", tokenResponse["refresh_token"] as? String ?: "")
             put("expiresAt", expiresAt)
-            
+
             // Include granted scopes if available, otherwise try to parse from the token response
-            val scopes = grantedScopes ?: (tokenResponse["scope"] as? String)?.split(" ") ?: emptyList()
-            put("scopes", JSArray().apply {
-                scopes.forEach { put(it) }
-            })
+            val scopes =
+                    grantedScopes ?: (tokenResponse["scope"] as? String)?.split(" ") ?: emptyList()
+            put("scopes", JSArray().apply { scopes.forEach { put(it) } })
         }
     }
 }

@@ -23,8 +23,8 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                    getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
             )
         }
     }
@@ -32,11 +32,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_1_8
-        }
-    }
+    kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_1_8 } }
 }
 
 dependencies {
@@ -52,22 +48,23 @@ dependencies {
     implementation("androidx.credentials:credentials:1.5.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-    
+
     // Secure storage
     implementation("androidx.security:security-crypto:1.1.0")
-    
+
     // HTTP client for token exchange
-    // PINNED: okhttp 4.12.0 (Kotlin 1.9 compatible) - DO NOT upgrade to 5.x until Tauri uses Kotlin 2.x
+    // PINNED: okhttp 4.12.0 (Kotlin 1.9 compatible) - DO NOT upgrade to 5.x until Tauri uses Kotlin
+    // 2.x
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    
+
     // JSON parsing
     implementation("com.google.code.gson:gson:2.14.0")
-    
+
     // Coroutines for async operations
     // PINNED: 1.7.3 (Kotlin 1.9 compatible) - DO NOT upgrade to 1.8+ until Tauri uses Kotlin 2.x
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-    
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
