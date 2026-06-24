@@ -7,14 +7,13 @@ plugins {
 
 android {
     namespace = "app.tauri.googleauth"
-    // Android 17
-    compileSdk = 36
+    
+    compileSdk = 37 // Android 17
 
     defaultConfig {
-        // Android 8.0 and above
-        minSdk = 26
-        targetSdk = 37
-
+ 
+        minSdk = 26 // Android 8.0 and above
+        
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -29,14 +28,14 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_1_8 } }
+    kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.core:core-ktx:1.18.0") //updated at 24/jun/26 1.19.0 is breaking
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.constraintlayout:constraintlayout:2.2.1")
@@ -45,25 +44,21 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.6.0")
 
     // Credential Manager for native sign-in flow
-    implementation("androidx.credentials:credentials:1.5.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
 
     // Secure storage
     implementation("androidx.security:security-crypto:1.1.0")
 
     // HTTP client for token exchange
-    // PINNED: okhttp 4.12.0 (Kotlin 1.9 compatible) - DO NOT upgrade to 5.x until Tauri uses Kotlin
-    // 2.x
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
 
     // JSON parsing
     implementation("com.google.code.gson:gson:2.14.0")
 
-    // Coroutines for async operations
-    // PINNED: 1.7.3 (Kotlin 1.9 compatible) - DO NOT upgrade to 1.8+ until Tauri uses Kotlin 2.x
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

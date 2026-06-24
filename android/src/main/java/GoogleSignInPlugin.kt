@@ -152,6 +152,16 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun signInNative(invoke: Invoke, args: SignInArgs) {
+        // conditional early close on unsupported device
+        /*  if (Build.VERSION.SDK_INT >= 36) {
+            invoke.reject("Unsupported Android Version")
+        } else {
+            startCredentialManagerSignIn(invoke, args)
+        } */
+        startCredentialManagerSignIn(invoke, args)
+    }
+
+    private fun startCredentialManagerSignIn(invoke: Invoke, args: SignInArgs) {
         scope.launch {
             try {
                 // Step 1: Get ID token via CredentialManager (using main activity)
