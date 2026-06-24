@@ -1,5 +1,7 @@
 package app.tauri.googleauth
 
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import kotlinx.coroutines.launch
 import android.app.Activity
 import android.content.Intent
 import android.util.Base64
@@ -25,7 +27,6 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
 import com.google.android.gms.common.api.Scope
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.gson.Gson
 import java.security.SecureRandom
@@ -161,40 +162,42 @@ class GoogleSignInPlugin(private val activity: Activity) : Plugin(activity) {
         startCredentialManagerSignIn(invoke, args)
     }
 
-    private fun startCredentialManagerSignIn(invoke: Invoke, args: SignInArgs) {
-        scope.launch {
-            try {
-                // Step 1: Get ID token via CredentialManager (using main activity)
-                val googleIdOption =
-                        GetGoogleIdOption.Builder()
-                                .setServerClientId(args.clientId)
-                                .setFilterByAuthorizedAccounts(false)
-                                .setAutoSelectEnabled(false)
-                                .setNonce(generateSecureRandomNonce())
-                                .build()
+   private fun startCredentialManagerSignIn(invoke: Invoke, args: SignInArgs) {
+    scope.launch {
+        try {
+            // Step 1: Get ID token via CredentialManager (using main activity)
+            // FIXED: Using GetSignInWithGoogleOption to handle multi-account picker
+            val signInOption = GetSignInWithGoogleOption.Builder(args.clientId)
+                .setNonce(generateSecureRandomNonce())
+                .build()
 
-                val request =
-                        GetCredentialRequest.Builder().addCredentialOption(googleIdOption).build()
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(signInOption)
+                .build()
 
-                val result = credentialManager.getCredential(context = activity, request = request)
+            val result = credentialManager.getCredential(
+                context = activity, 
+                request = request
+            )
 
-                val credential = result.credential
-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                val idToken = googleIdTokenCredential.idToken
+            val credential = result.credential
+            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+            val idToken = googleIdTokenCredential.idToken
 
-                // Step 2: Get access token via AuthorizationClient
-                startNativeAuthorization(invoke, idToken, args.scopes)
-            } catch (e: GetCredentialCancellationException) {
-                invoke.reject("Sign-in cancelled: ${e.message}")
-            } catch (e: NoCredentialException) {
-                invoke.reject("No Google account found: ${e.message}")
-            } catch (e: GetCredentialException) {
-                invoke.reject("Credential error [${e.type}]: ${e.message}")
-            } catch (e: Exception) {
-                invoke.reject("Sign-in failed [${e.javaClass.simpleName}]: ${e.message}")
-            }
+            // Step 2: Get access token via AuthorizationClient
+            startNativeAuthorization(invoke, idToken, args.scopes)
+            
+        } catch (e: GetCredentialCancellationException) {
+            invoke.reject("Sign-in cancelled: ${e.message}")
+        } catch (e: NoCredentialException) {
+            invoke.reject("No Google account found: ${e.message}")
+        } catch (e: GetCredentialException) {
+            invoke.reject("Credential error [${e.type}]: ${e.message}")
+        } catch (e: Exception) {
+            invoke.reject("Sign-in failed [${e.javaClass.simpleName}]: ${e.message}")
         }
     }
+}
 
     private var pendingNativeInvoke: Invoke? = null
     private var pendingIdToken: String? = null
